@@ -27,9 +27,6 @@
     <ClCompile Include="HillsDemo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Shapes.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="WavesDemo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -63,12 +60,27 @@
     <ClCompile Include="..\Common\d3dUtil.cpp">
       <Filter>Common</Filter>
     </ClCompile>
+    <ClCompile Include="..\Common\Effects.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Common\Vertex.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="ShapesLightDemo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="TextureDemo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="FX\LightHelper.fx">
       <Filter>FX</Filter>
     </CustomBuild>
     <CustomBuild Include="FX\Lighting.fx">
+      <Filter>FX</Filter>
+    </CustomBuild>
+    <CustomBuild Include="FX\Basic.fx">
       <Filter>FX</Filter>
     </CustomBuild>
   </ItemGroup>
@@ -104,6 +116,12 @@
       <Filter>Common</Filter>
     </ClInclude>
     <ClInclude Include="..\Common\d3dx11effect.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Common\Effects.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Common\Vertex.h">
       <Filter>Common</Filter>
     </ClInclude>
   </ItemGroup>
