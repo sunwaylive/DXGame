@@ -8,7 +8,7 @@
 enum RenderOptions
 {
 	Lighting = 0,
-	Texture = 1,
+	Textures = 1,
 	TexturesAndFog = 2
 };
 
@@ -38,13 +38,22 @@ private:
 private:
 	ID3D11Buffer *mBoxVB;
 	ID3D11Buffer *mBoxIB;
-	ID3D11ShaderResourceView *mBoxMapSRV;
+
+	ID3D11Buffer* mLandVB;
+	ID3D11Buffer* mLandIB;
+
+	ID3D11Buffer* mWavesVB;
+	ID3D11Buffer* mWavesIB;
 
 	DirectionalLight mDirLights[3];
-	Material mBoxMat;
 
-	XMFLOAT4X4 mTexTransform;
+	Material mBoxMat;
+	Material mLandMat;
+	Material mWavesMat;
+
 	XMFLOAT4X4 mBoxWorld;
+	XMFLOAT4X4 mLandWorld;
+	XMFLOAT4X4 mWavesWorld;
 
 	XMFLOAT4X4 mView;
 	XMFLOAT4X4 mProj;
@@ -59,49 +68,39 @@ private:
 
 	float mTheta;
 	float mPhi;
-	float mRaduis;
+	float mRadius;
 
 	POINT mLastMousePos;
 	
 	//for land and wave
 	Waves mWaves;
 
-	ID3D11Buffer* mLandVB;
-	ID3D11Buffer* mLandIB;
-
-	ID3D11Buffer* mWavesVB;
-	ID3D11Buffer* mWavesIB;
-
-	Material mLandMat;
-	Material mWavesMat;
-
 	XMFLOAT4X4 mGrassTexTransform;
 	XMFLOAT4X4 mWaterTexTransform;
-	XMFLOAT4X4 mLandWorld;
-	XMFLOAT4X4 mWavesWorld;
 
 	UINT mLandIndexCount;
 	XMFLOAT2 mWaterTexOffset;
 
 	ID3D11ShaderResourceView* mGrassMapSRV;
 	ID3D11ShaderResourceView* mWavesMapSRV;
+	ID3D11ShaderResourceView *mBoxMapSRV;
 
 };
 
-TextureApp::TextureApp(HINSTANCE hInstance) : D3DApp(hInstance),
-mBoxVB(NULL), mBoxIB(NULL), mBoxMapSRV(NULL), mEyePosW(0.0f, 0.0f, 0.0f),
-mTheta(1.3 * MathHelper::Pi), mPhi(0.4 * MathHelper::Pi), mRaduis(80.f),
-mLandIndexCount(0), mWavesVB(NULL), mWavesIB(NULL), mWaterTexOffset(0.0f, 0.0f), 
-mLandVB(NULL), mLandIB(NULL), mRenderOptions(RenderOptions::TexturesAndFog)
+TextureApp::TextureApp(HINSTANCE hInstance)
+: D3DApp(hInstance), mLandVB(0), mLandIB(0), mWavesVB(0), mWavesIB(0), mBoxVB(0), mBoxIB(0), mGrassMapSRV(0), mWavesMapSRV(0), mBoxMapSRV(0),
+mWaterTexOffset(0.0f, 0.0f), mEyePosW(0.0f, 0.0f, 0.0f), mLandIndexCount(0), mRenderOptions(RenderOptions::TexturesAndFog),
+mTheta(1.3f*MathHelper::Pi), mPhi(0.4f*MathHelper::Pi), mRadius(80.0f)
 {
-	mMainWndCaption = L"Texture Demo william";
+	mMainWndCaption = L"william - fog, blend, clip";
+	mEnable4xMsaa = false;
+
 	mLastMousePos.x = 0;
 	mLastMousePos.y = 0;
 
 	XMMATRIX I = XMMatrixIdentity();
 	XMStoreFloat4x4(&mLandWorld, I);
 	XMStoreFloat4x4(&mWavesWorld, I);
-	XMStoreFloat4x4(&mTexTransform, I);
 	XMStoreFloat4x4(&mView, I);
 	XMStoreFloat4x4(&mProj, I);
 
@@ -127,23 +126,26 @@ mLandVB(NULL), mLandIB(NULL), mRenderOptions(RenderOptions::TexturesAndFog)
 	mDirLights[2].Ambient = XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f);
 	mDirLights[2].Diffuse = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
 	mDirLights[2].Specular = XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f);
-	mDirLights[2].Direction = XMFLOAT3(0.0f, -0.707f, -0.707f);
-	
-	mBoxMat.Ambient = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
-	mBoxMat.Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
-	mBoxMat.Specular = XMFLOAT4(0.6f, 0.6f, 0.6f, 16.0f);
+	mDirLights[2].Direction = XMFLOAT3(0.0f, -0.707f, -0.707f);	
 
 	mLandMat.Ambient = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
 	mLandMat.Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
 	mLandMat.Specular = XMFLOAT4(0.2f, 0.2f, 0.2f, 16.0f);
 
 	mWavesMat.Ambient = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
-	mWavesMat.Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	//!!!!the alpha of the water is very important, which is the last parameter
+	//this decides whether the water is transparent or not
+	mWavesMat.Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 0.5f); 
 	mWavesMat.Specular = XMFLOAT4(0.8f, 0.8f, 0.8f, 32.0f);
+
+	mBoxMat.Ambient = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
+	mBoxMat.Diffuse = XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f);
+	mBoxMat.Specular = XMFLOAT4(0.6f, 0.6f, 0.6f, 16.0f);
 }
 
 TextureApp::~TextureApp()
 {
+	md3dImmediateContext->ClearState();
 	ReleaseCOM(mBoxVB);
 	ReleaseCOM(mBoxIB);
 	ReleaseCOM(mBoxMapSRV);
@@ -156,6 +158,7 @@ TextureApp::~TextureApp()
 
 	Effects::DestroyAll();
 	InputLayouts::DestroyAll();
+	RenderStates::DestroyAll();
 }
 
 bool TextureApp::Init()
@@ -166,20 +169,21 @@ bool TextureApp::Init()
 	//must init effect first
 	Effects::InitAll(md3dDevice);
 	InputLayouts::InitAll(md3dDevice);
-
-	HR(D3DX11CreateShaderResourceViewFromFile(md3dDevice, L"Textures/darkbrickdxt1.dds",
-		0, 0, &mBoxMapSRV, 0));
-	BuildBoxGeometryBuffers();
-
+	RenderStates::InitAll(md3dDevice);
+	
 	//for waves and land
-	mWaves.Init(160.0f, 160.f, 1.0f, 0.03f, 3.25f, 0.4f);
+	mWaves.Init(160.0f, 160.f, 1.0f, 0.03f, 5.0f, 0.3f);
+
 	HR(D3DX11CreateShaderResourceViewFromFile(md3dDevice, L"Textures/grass.dds", 0, 0,
 		&mGrassMapSRV, 0));
 	HR(D3DX11CreateShaderResourceViewFromFile(md3dDevice, L"Textures/water2.dds", 0, 0,
 		&mWavesMapSRV, 0));
+	HR(D3DX11CreateShaderResourceViewFromFile(md3dDevice, L"Textures/WireFence.dds",
+		0, 0, &mBoxMapSRV, 0));
 
 	BuildLandGeometryBuffers();
 	BuildWaveGeometryBuffers();
+	BuildBoxGeometryBuffers();
 
 	return true;
 }
@@ -195,9 +199,9 @@ void TextureApp::OnResize()
 
 void TextureApp::UpdateScene(float dt)
 {
-	float x = mRaduis * sinf(mPhi) * cosf(mTheta);
-	float z = mRaduis * sinf(mPhi) * sinf(mTheta);
-	float y = mRaduis * cosf(mPhi);
+	float x = mRadius * sinf(mPhi) * cosf(mTheta);
+	float z = mRadius * sinf(mPhi) * sinf(mTheta);
+	float y = mRadius * cosf(mPhi);
 
 	mEyePosW = XMFLOAT3(x, y, z);
 	 //build the view matrix
@@ -216,10 +220,10 @@ void TextureApp::UpdateScene(float dt)
 		DWORD i = 5 + rand() % (mWaves.RowCount() - 10);
 		DWORD j = 5 + rand() % (mWaves.ColumnCount() - 10);
 
-		float r = MathHelper::RandF(1.0f, 2.0f);
+		float r = MathHelper::RandF(0.5f, 1.0f);
 		mWaves.Disturb(i, j, r);
 	}
-	mWaves.Update(dt);
+	mWaves.Update(dt);	
 
 	//update the waves vertex buffer, uing map function
 	D3D11_MAPPED_SUBRESOURCE mappedData;
@@ -249,7 +253,7 @@ void TextureApp::UpdateScene(float dt)
 		mRenderOptions = RenderOptions::Lighting;
 
 	if (GetAsyncKeyState('2') & 0x8000)
-		mRenderOptions = RenderOptions::Texture;
+		mRenderOptions = RenderOptions::Textures;
 
 	if (GetAsyncKeyState('3') & 0x8000)
 		mRenderOptions = RenderOptions::TexturesAndFog;
@@ -257,15 +261,12 @@ void TextureApp::UpdateScene(float dt)
 
 void TextureApp::DrawScene()
 {
-	md3dImmediateContext->ClearRenderTargetView(mRenderTargetView, (float *)&Colors::Magenta);
+	md3dImmediateContext->ClearRenderTargetView(mRenderTargetView, (float *)&Colors::Silver);
 	md3dImmediateContext->ClearDepthStencilView(mDepthStencilView, D3D11_CLEAR_DEPTH || D3D11_CLEAR_STENCIL, 1.0f, 0);
 
 	md3dImmediateContext->IASetInputLayout(InputLayouts::Basic32);
 	md3dImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-	//set blend factors;
-	float blendFactor[] = {0.0f, 0.0f, 0.0f, 0.0f};
-
+	
 	UINT stride = sizeof(Vertex::Basic32);
 	UINT offset = 0;
 	XMMATRIX view = XMLoadFloat4x4(&mView);
@@ -282,19 +283,19 @@ void TextureApp::DrawScene()
 	Effects::BasicFX->SetFogRange(175.0f);
 
 	ID3DX11EffectTechnique *boxTech;
-	ID3DX11EffectTechnique *landAndWaveTech = Effects::BasicFX->Light2TexTech;
+	ID3DX11EffectTechnique *landAndWaveTech;//= Effects::BasicFX->Light2TexTech;
 
 	switch (mRenderOptions)
 	{
-	case Lighting:
+	case RenderOptions::Lighting:
 		boxTech = Effects::BasicFX->Light3Tech;
 		landAndWaveTech = Effects::BasicFX->Light3Tech;
 		break;
-	case Texture:
+	case RenderOptions::Textures:
 		boxTech = Effects::BasicFX->Light3TexAlphaClipTech;
-		landAndWaveTech = Effects::BasicFX->Light3Tech;
+		landAndWaveTech = Effects::BasicFX->Light3TexTech;
 		break;
-	case TexturesAndFog:
+	case RenderOptions::TexturesAndFog:
 		boxTech = Effects::BasicFX->Light3TexAlphaClipFogTech;
 		landAndWaveTech = Effects::BasicFX->Light3TexFogTech;
 		break;
@@ -365,9 +366,15 @@ void TextureApp::DrawScene()
 		Effects::BasicFX->SetTexTransform(XMLoadFloat4x4(&mWaterTexTransform));
 		Effects::BasicFX->SetMaterial(mWavesMat);
 		Effects::BasicFX->SetDiffuseMap(mWavesMapSRV);
-
+		
+		//set blend factors;
+		float blendFactor[] = { 0.0f, 0.0f, 0.0f, 0.0f };
+		md3dImmediateContext->OMSetBlendState(RenderStates::TransparentBS, blendFactor, 0xffffffff);
 		landAndWaveTech->GetPassByIndex(p)->Apply(0, md3dImmediateContext);
 		md3dImmediateContext->DrawIndexed(3 * mWaves.TriangleCount(), 0, 0);
+
+		//restore
+		md3dImmediateContext->OMSetBlendState(NULL, blendFactor, 0xffffffff);
 	}
 
 	HR(mSwapChain->Present(0, 0));
@@ -402,9 +409,9 @@ void TextureApp::OnMouseMove(WPARAM btnState, int x, int y)
 	{
 		float dx = 0.01f * (x - mLastMousePos.x);
 		float dy = 0.01f * (y - mLastMousePos.y);
-		mRaduis += (dx - dy);
+		mRadius += (dx - dy);
 
-		mRaduis = MathHelper::Clamp(mRaduis, 50.0f, 500.0f);
+		mRadius = MathHelper::Clamp(mRadius, 20.0f, 500.0f);
 	}
 
 	mLastMousePos.x = x;
