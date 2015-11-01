@@ -3,6 +3,14 @@
 #include "Vertex.h"
 #include "GeometryGenerator.h"
 #include "Waves.h"
+#include "RenderStates.h"
+
+enum RenderOptions
+{
+	Lighting = 0,
+	Texture = 1,
+	TexturesAndFog = 2
+};
 
 class TextureApp : public D3DApp
 {
@@ -20,7 +28,7 @@ public:
 	void OnMouseMove(WPARAM btnState, int x, int y);
 
 private:
-	void BuildGeometryBuffers();
+	void BuildBoxGeometryBuffers();
 	//for land and wave
 	void BuildLandGeometryBuffers();
 	void BuildWaveGeometryBuffers();
@@ -46,6 +54,8 @@ private:
 	UINT mBoxIndexCount;
 
 	XMFLOAT3 mEyePosW;
+
+	RenderOptions mRenderOptions;
 
 	float mTheta;
 	float mPhi;
@@ -82,33 +92,37 @@ TextureApp::TextureApp(HINSTANCE hInstance) : D3DApp(hInstance),
 mBoxVB(NULL), mBoxIB(NULL), mBoxMapSRV(NULL), mEyePosW(0.0f, 0.0f, 0.0f),
 mTheta(1.3 * MathHelper::Pi), mPhi(0.4 * MathHelper::Pi), mRaduis(80.f),
 mLandIndexCount(0), mWavesVB(NULL), mWavesIB(NULL), mWaterTexOffset(0.0f, 0.0f), 
-mLandVB(NULL), mLandIB(NULL)
+mLandVB(NULL), mLandIB(NULL), mRenderOptions(RenderOptions::TexturesAndFog)
 {
 	mMainWndCaption = L"Texture Demo william";
 	mLastMousePos.x = 0;
 	mLastMousePos.y = 0;
 
 	XMMATRIX I = XMMatrixIdentity();
-	XMStoreFloat4x4(&mBoxWorld, I);
 	XMStoreFloat4x4(&mLandWorld, I);
 	XMStoreFloat4x4(&mWavesWorld, I);
 	XMStoreFloat4x4(&mTexTransform, I);
 	XMStoreFloat4x4(&mView, I);
 	XMStoreFloat4x4(&mProj, I);
 
+	//scale box
+	XMMATRIX boxScale = XMMatrixScaling(15.0f, 15.0f, 15.0f);
+	XMMATRIX boxOffset = XMMatrixTranslation(8.0f, 5.0f, -15.0f);
+	XMStoreFloat4x4(&mBoxWorld, boxScale * boxOffset);//Scale * Rotation * Transform
+
 	//for grass land
 	XMMATRIX grassTexScale = XMMatrixScaling(5.0f, 5.0f, 0.0f);
 	XMStoreFloat4x4(&mGrassTexTransform, grassTexScale);
 
-	mDirLights[0].Ambient = XMFLOAT4(0.3f, 0.3f, 0.3f, 1.0f);
-	mDirLights[0].Diffuse = XMFLOAT4(0.8f, 0.8f, 0.8f, 1.0f);
-	mDirLights[0].Specular = XMFLOAT4(0.6f, 0.6f, 0.6f, 16.0f);
-	mDirLights[0].Direction = XMFLOAT3(0.707f, -0.707f, 0.0f);
+	mDirLights[0].Ambient = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
+	mDirLights[0].Diffuse = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
+	mDirLights[0].Specular = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
+	mDirLights[0].Direction = XMFLOAT3(0.57735f, -0.57735f, 0.57735f);
 
-	mDirLights[1].Ambient = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
-	mDirLights[1].Diffuse = XMFLOAT4(1.4f, 1.4f, 1.4f, 1.0f);
-	mDirLights[1].Specular = XMFLOAT4(0.3f, 0.3f, 0.3f, 16.0f);
-	mDirLights[1].Direction = XMFLOAT3(-0.707f, 0.0f, 0.707f);
+	mDirLights[1].Ambient = XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f);
+	mDirLights[1].Diffuse = XMFLOAT4(0.20f, 0.20f, 0.20f, 1.0f);
+	mDirLights[1].Specular = XMFLOAT4(0.25f, 0.25f, 0.25f, 1.0f);
+	mDirLights[1].Direction = XMFLOAT3(-0.57735f, -0.57735f, 0.57735f);
 
 	mDirLights[2].Ambient = XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f);
 	mDirLights[2].Diffuse = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
@@ -155,7 +169,7 @@ bool TextureApp::Init()
 
 	HR(D3DX11CreateShaderResourceViewFromFile(md3dDevice, L"Textures/darkbrickdxt1.dds",
 		0, 0, &mBoxMapSRV, 0));
-	BuildGeometryBuffers();
+	BuildBoxGeometryBuffers();
 
 	//for waves and land
 	mWaves.Init(160.0f, 160.f, 1.0f, 0.03f, 3.25f, 0.4f);
@@ -227,8 +241,18 @@ void TextureApp::UpdateScene(float dt)
 	mWaterTexOffset.x += 0.1f * dt;
 	XMMATRIX wavesOffset = XMMatrixTranslation(mWaterTexOffset.x, mWaterTexOffset.y, 0.f);
 
-	//combine scale and translation
+	//combine wave scale and wave translation
 	XMStoreFloat4x4(&mWaterTexTransform, waveScale * wavesOffset);
+
+	//switch the render mode based in key input
+	if (GetAsyncKeyState('1') & 0x8000)
+		mRenderOptions = RenderOptions::Lighting;
+
+	if (GetAsyncKeyState('2') & 0x8000)
+		mRenderOptions = RenderOptions::Texture;
+
+	if (GetAsyncKeyState('3') & 0x8000)
+		mRenderOptions = RenderOptions::TexturesAndFog;
 }
 
 void TextureApp::DrawScene()
@@ -238,6 +262,9 @@ void TextureApp::DrawScene()
 
 	md3dImmediateContext->IASetInputLayout(InputLayouts::Basic32);
 	md3dImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	//set blend factors;
+	float blendFactor[] = {0.0f, 0.0f, 0.0f, 0.0f};
 
 	UINT stride = sizeof(Vertex::Basic32);
 	UINT offset = 0;
@@ -249,36 +276,70 @@ void TextureApp::DrawScene()
 	Effects::BasicFX->SetDirLights(mDirLights);
 	Effects::BasicFX->SetEyePosW(mEyePosW);
 
-	ID3DX11EffectTechnique *activeTech = Effects::BasicFX->Light2TexTech;
-	D3DX11_TECHNIQUE_DESC techDesc;
-	activeTech->GetDesc(&techDesc);
-	for (UINT p = 0; p < techDesc.Passes; ++p)
+	//set fog parameters
+	Effects::BasicFX->SetFogColor(Colors::Silver);
+	Effects::BasicFX->SetFogStart(15.0f);
+	Effects::BasicFX->SetFogRange(175.0f);
+
+	ID3DX11EffectTechnique *boxTech;
+	ID3DX11EffectTechnique *landAndWaveTech = Effects::BasicFX->Light2TexTech;
+
+	switch (mRenderOptions)
 	{
-		//draw the box
-		md3dImmediateContext->IASetVertexBuffers(0, 1, &mBoxVB, &stride, &offset); 
+	case Lighting:
+		boxTech = Effects::BasicFX->Light3Tech;
+		landAndWaveTech = Effects::BasicFX->Light3Tech;
+		break;
+	case Texture:
+		boxTech = Effects::BasicFX->Light3TexAlphaClipTech;
+		landAndWaveTech = Effects::BasicFX->Light3Tech;
+		break;
+	case TexturesAndFog:
+		boxTech = Effects::BasicFX->Light3TexAlphaClipFogTech;
+		landAndWaveTech = Effects::BasicFX->Light3TexFogTech;
+		break;
+	default:
+		break;
+	}
+	
+	D3DX11_TECHNIQUE_DESC techDesc;
+
+	//step1. draw the box with alpha clipping
+	boxTech->GetDesc(&techDesc);
+	for (int i = 0; i < techDesc.Passes; ++i)
+	{
+		md3dImmediateContext->IASetVertexBuffers(0, 1, &mBoxVB, &stride, &offset);
 		md3dImmediateContext->IASetIndexBuffer(mBoxIB, DXGI_FORMAT_R32_UINT, 0);
 
 		XMMATRIX world = XMLoadFloat4x4(&mBoxWorld);
 		XMMATRIX worldInvTranspose = MathHelper::InverseTranspose(world);
-		XMMATRIX worldViewProj = world * view * proj;
+		XMMATRIX worldViewProj = world * viewProj;
 
 		Effects::BasicFX->SetWorld(world);
 		Effects::BasicFX->SetWorldInvTranspose(worldInvTranspose);
 		Effects::BasicFX->SetWorldViewProj(worldViewProj);
-		Effects::BasicFX->SetTexTransform(XMLoadFloat4x4(&mTexTransform));
+		Effects::BasicFX->SetTexTransform(XMMatrixIdentity()); //don't transform texture
 		Effects::BasicFX->SetMaterial(mBoxMat);
 		Effects::BasicFX->SetDiffuseMap(mBoxMapSRV);
 
-		activeTech->GetPassByIndex(p)->Apply(0, md3dImmediateContext);
-		md3dImmediateContext->DrawIndexed(mBoxIndexCount, mBoxIndexOffset, mBoxVertexOffset);
+		md3dImmediateContext->RSSetState(RenderStates::NoCullRS);
+		boxTech->GetPassByIndex(i)->Apply(0, md3dImmediateContext);
+		md3dImmediateContext->DrawIndexed(36, 0, 0);
 
+		md3dImmediateContext->RSSetState(NULL);
+	}
+	
+	//step2. draw land and waves
+	landAndWaveTech->GetDesc(&techDesc);
+	for (UINT p = 0; p < techDesc.Passes; ++p)
+	{
 		//draw the hills
 		md3dImmediateContext->IASetVertexBuffers(0, 1, &mLandVB, &stride, &offset);
 		md3dImmediateContext->IASetIndexBuffer(mLandIB, DXGI_FORMAT_R32_UINT, 0);
 
-		world = XMLoadFloat4x4(&mLandWorld);
-		worldInvTranspose = MathHelper::InverseTranspose(world);
-		worldViewProj = world * viewProj;
+		XMMATRIX world = XMLoadFloat4x4(&mLandWorld);
+		XMMATRIX worldInvTranspose = MathHelper::InverseTranspose(world);
+		XMMATRIX worldViewProj = world * viewProj;
 
 		Effects::BasicFX->SetWorld(world);
 		Effects::BasicFX->SetWorldInvTranspose(worldInvTranspose);
@@ -287,7 +348,7 @@ void TextureApp::DrawScene()
 		Effects::BasicFX->SetMaterial(mLandMat);
 		Effects::BasicFX->SetDiffuseMap(mGrassMapSRV);
 
-		activeTech->GetPassByIndex(p)->Apply(0, md3dImmediateContext);
+		landAndWaveTech->GetPassByIndex(p)->Apply(0, md3dImmediateContext);
 		md3dImmediateContext->DrawIndexed(mLandIndexCount, 0, 0);
 
 		//draw the waves
@@ -305,7 +366,7 @@ void TextureApp::DrawScene()
 		Effects::BasicFX->SetMaterial(mWavesMat);
 		Effects::BasicFX->SetDiffuseMap(mWavesMapSRV);
 
-		activeTech->GetPassByIndex(p)->Apply(0, md3dImmediateContext);
+		landAndWaveTech->GetPassByIndex(p)->Apply(0, md3dImmediateContext);
 		md3dImmediateContext->DrawIndexed(3 * mWaves.TriangleCount(), 0, 0);
 	}
 
@@ -459,7 +520,7 @@ void TextureApp::BuildWaveGeometryBuffers()
 	HR(md3dDevice->CreateBuffer(&ibd, &iinitData, &mWavesIB));
 }
 
-void TextureApp::BuildGeometryBuffers()
+void TextureApp::BuildBoxGeometryBuffers()
 {
 	GeometryGenerator::MeshData box;
 	GeometryGenerator geoGen;

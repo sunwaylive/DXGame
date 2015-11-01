@@ -72,6 +72,9 @@
     <ClCompile Include="TextureDemo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\Common\RenderStates.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="FX\LightHelper.fx">
@@ -122,6 +125,9 @@
       <Filter>Common</Filter>
     </ClInclude>
     <ClInclude Include="..\Common\Vertex.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Common\RenderStates.h">
       <Filter>Common</Filter>
     </ClInclude>
   </ItemGroup>
