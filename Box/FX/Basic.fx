@@ -75,8 +75,8 @@ float4 PS(VertexOut pin, uniform int gLightCount, uniform bool gUseTexure, unifo
     pin.NormalW = normalize(pin.NormalW);
 
 	// The toEye vector is used in lighting.
-	float3 toEye = gEyePosW - pin.PosW; 
-	 
+	float3 toEye = gEyePosW - pin.PosW;
+
 	// Cache the distance to the eye from this surface point.
 	float distToEye = length(toEye);
 
@@ -105,8 +105,8 @@ float4 PS(VertexOut pin, uniform int gLightCount, uniform bool gUseTexure, unifo
 
 	float4 litColor = texColor;
 	if( gLightCount > 0  )
-	{  
-		// Start with a sum of zero. 
+	{
+		// Start with a sum of zero.
 		float4 ambient = float4(0.0f, 0.0f, 0.0f, 0.0f);
 		float4 diffuse = float4(0.0f, 0.0f, 0.0f, 0.0f);
 		float4 spec    = float4(0.0f, 0.0f, 0.0f, 0.0f);

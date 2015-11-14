@@ -166,6 +166,7 @@
     <ClCompile Include="..\Common\xnacollision.cpp" />
     <ClCompile Include="BoxDemo.cpp" />
     <ClCompile Include="HillsDemo.cpp" />
+    <ClCompile Include="MirrorDemo.cpp" />
     <ClCompile Include="ShapesLightDemo.cpp" />
     <ClCompile Include="TextureDemo.cpp" />
     <ClCompile Include="WavesDemo.cpp" />
