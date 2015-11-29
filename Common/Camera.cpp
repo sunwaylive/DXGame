@@ -182,6 +182,14 @@ void Camera::Walk(float d)
 	XMStoreFloat3(&mPosition, XMVectorMultiplyAdd(s, l, p));
 }
 
+void Camera::RiseOrDrop(float d)
+{
+	XMVECTOR scale = XMVectorReplicate(d);
+	XMVECTOR up = XMLoadFloat3(&mUp);
+	XMVECTOR p = XMLoadFloat3(&mPosition);
+	XMStoreFloat3(&mPosition, XMVectorMultiplyAdd(scale, up, p));
+}
+
 void Camera::Pitch(float angle)
 {
 	// Rotate up and look vector about the right vector.

@@ -6,6 +6,7 @@
 #include "Effects.h"
 #include "Vertex.h"
 #include "RenderStates.h"
+#include "Camera.h"
 
 enum RenderOptions
 {
@@ -55,6 +56,7 @@ private:
 	UINT mSkullIndexCount;
 	XMFLOAT3 mSkullTranslation;
 
+	Camera mCam;
 	XMFLOAT4X4 mView;
 	XMFLOAT4X4 mProj;
 
@@ -93,6 +95,8 @@ mTheta(1.24f*MathHelper::Pi), mPhi(0.42f*MathHelper::Pi), mRadius(12.0f)
 {
 	mMainWndCaption = L"Mirror Demo";
 	mEnable4xMsaa = false;
+
+	mCam.SetPosition(0.0f, 2.0f, -15.0f);
 
 	mLastMousePos.x = 0;
 	mLastMousePos.y = 0;
@@ -172,28 +176,32 @@ bool MirrorApp::Init()
 void MirrorApp::OnResize()
 {
 	D3DApp::OnResize();
-
-	XMMATRIX P = XMMatrixPerspectiveFovLH(0.25f*MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
-	XMStoreFloat4x4(&mProj, P);
+	
+	mCam.SetLens(0.25f*MathHelper::Pi, AspectRatio(), 1.0f, 1000.0f);
 }
 
 void MirrorApp::UpdateScene(float dt)
 {
-	// Convert Spherical to Cartesian coordinates.
-	float x = mRadius*sinf(mPhi)*cosf(mTheta);
-	float z = mRadius*sinf(mPhi)*sinf(mTheta);
-	float y = mRadius*cosf(mPhi);
+	//
+	// Control the camera.
+	//
+	if (GetAsyncKeyState('W') & 0x8000)
+		mCam.Walk(10.0f*dt);
 
-	mEyePosW = XMFLOAT3(x, y, z);
+	if (GetAsyncKeyState('S') & 0x8000)
+		mCam.Walk(-10.0f*dt);
 
-	// Build the view matrix.
-	XMVECTOR pos = XMVectorSet(x, y, z, 1.0f);
-	XMVECTOR target = XMVectorZero();
-	XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+	if (GetAsyncKeyState('A') & 0x8000)
+		mCam.Strafe(-10.0f*dt);
 
-	XMMATRIX V = XMMatrixLookAtLH(pos, target, up);
-	XMStoreFloat4x4(&mView, V);
+	if (GetAsyncKeyState('D') & 0x8000)
+		mCam.Strafe(10.0f*dt);
 
+	if (GetAsyncKeyState(VK_SPACE) & 0x8000)
+		mCam.RiseOrDrop(10.0f*dt);
+
+	if (GetAsyncKeyState(VK_CONTROL) & 0x8000)
+		mCam.RiseOrDrop(-10.0f * dt);
 	//
 	// Switch the render mode based in key input.
 	//
@@ -205,21 +213,20 @@ void MirrorApp::UpdateScene(float dt)
 
 	if (GetAsyncKeyState('3') & 0x8000)
 		mRenderOptions = RenderOptions::TexturesAndFog;
-
-
+		
 	//
 	// Allow user to move box.
 	//
-	if (GetAsyncKeyState('A') & 0x8000)
+	if (GetAsyncKeyState(VK_LEFT) & 0x8000)
 		mSkullTranslation.x -= 1.0f*dt;
 
-	if (GetAsyncKeyState('D') & 0x8000)
+	if (GetAsyncKeyState(VK_RIGHT) & 0x8000)
 		mSkullTranslation.x += 1.0f*dt;
 
-	if (GetAsyncKeyState('W') & 0x8000)
+	if (GetAsyncKeyState(VK_UP) & 0x8000)
 		mSkullTranslation.y += 1.0f*dt;
 
-	if (GetAsyncKeyState('S') & 0x8000)
+	if (GetAsyncKeyState(VK_DOWN) & 0x8000)
 		mSkullTranslation.y -= 1.0f*dt;
 
 	// Don't let user move below ground plane.
@@ -251,13 +258,15 @@ void MirrorApp::DrawScene()
 	UINT stride = sizeof(Vertex::Basic32);
 	UINT offset = 0;
 
-	XMMATRIX view = XMLoadFloat4x4(&mView);
-	XMMATRIX proj = XMLoadFloat4x4(&mProj);
-	XMMATRIX viewProj = view * proj;
+	mCam.UpdateViewMatrix();
+
+	XMMATRIX view = mCam.View();
+	XMMATRIX proj = mCam.Proj();
+	XMMATRIX viewProj = mCam.ViewProj();
 
 	//set per frame constants
 	Effects::BasicFX->SetDirLights(mDirLights);
-	Effects::BasicFX->SetEyePosW(mEyePosW);
+	Effects::BasicFX->SetEyePosW(mCam.GetPosition());
 	Effects::BasicFX->SetFogColor(Colors::Black);
 	Effects::BasicFX->SetFogStart(2.0f);
 	Effects::BasicFX->SetFogRange(40.f);
@@ -503,20 +512,20 @@ void MirrorApp::OnMouseUp(WPARAM btnState, int x, int y)
 
 void MirrorApp::OnMouseMove(WPARAM btnState, int x, int y)
 {
-	if ((btnState & MK_LBUTTON) != 0)
+	if ((btnState & MK_RBUTTON) != 0)
 	{
 		// Make each pixel correspond to a quarter of a degree.
 		float dx = XMConvertToRadians(0.25f*static_cast<float>(x - mLastMousePos.x));
 		float dy = XMConvertToRadians(0.25f*static_cast<float>(y - mLastMousePos.y));
 
 		// Update angles based on input to orbit camera around box.
-		mTheta += dx;
-		mPhi += dy;
+		mCam.Pitch(dy);
+		mCam.RotateY(dx);
 
 		// Restrict the angle mPhi.
 		mPhi = MathHelper::Clamp(mPhi, 0.1f, MathHelper::Pi - 0.1f);
 	}
-	else if ((btnState & MK_RBUTTON) != 0)
+	else if ((btnState & MK_LBUTTON) != 0)
 	{
 		// Make each pixel correspond to 0.01 unit in the scene.
 		float dx = 0.01f*static_cast<float>(x - mLastMousePos.x);
