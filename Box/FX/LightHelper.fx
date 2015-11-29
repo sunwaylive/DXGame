@@ -81,7 +81,7 @@ void ComputeDirectionalLight(Material mat, DirectionalLight L,
 	[flatten]
 	if( diffuseFactor > 0.0f )
 	{
-		float3 v         = reflect(-lightVec, normal);
+		float3 v         = reflect(-lightVec, normal); //intrinsic function
 		float specFactor = pow(max(dot(v, toEye), 0.0f), mat.Specular.w);
 					
 		diffuse = diffuseFactor * mat.Diffuse * L.Diffuse;

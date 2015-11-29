@@ -71,14 +71,14 @@ VertexOut VS(VertexIn vin)
  
 float4 PS(VertexOut pin, uniform int gLightCount, uniform bool gUseTexure, uniform bool gAlphaClip, uniform bool gFogEnabled) : SV_Target
 {
-	// Interpolating normal can unnormalize it, so normalize it.
+	// Interpolating normal can be unnormalized, so normalize it.
     pin.NormalW = normalize(pin.NormalW);
 
 	// The toEye vector is used in lighting.
 	float3 toEye = gEyePosW - pin.PosW;
 
 	// Cache the distance to the eye from this surface point.
-	float distToEye = length(toEye);
+	float distToEye = length(toEye); //intrinsic function
 
 	// Normalize.
 	toEye /= distToEye;
@@ -95,7 +95,7 @@ float4 PS(VertexOut pin, uniform int gLightCount, uniform bool gUseTexure, unifo
 			// Discard pixel if texture alpha < 0.1.  Note that we do this
 			// test as soon as possible so that we can potentially exit the shader 
 			// early, thereby skipping the rest of the shader code.
-			clip(texColor.a - 0.1f);
+			clip(texColor.a - 0.1f); //intrinsic function
 		}
 	}
 	 
@@ -125,7 +125,7 @@ float4 PS(VertexOut pin, uniform int gLightCount, uniform bool gUseTexure, unifo
 		}
 
 		// Modulate with late add.
-		litColor = texColor*(ambient + diffuse) + spec;
+		litColor = texColor*(ambient + diffuse) + spec; //* means component-wise
 	}
 
 	//
@@ -152,7 +152,7 @@ technique11 Light1
     {
         SetVertexShader( CompileShader( vs_5_0, VS() ) );
 		SetGeometryShader( NULL );
-        SetPixelShader( CompileShader( ps_5_0, PS(1, false, false, false) ) );
+        SetPixelShader( CompileShader( ps_5_0, PS(1, false, false, false) ) ); //first param is VertexOut from VS
     }
 }
 
