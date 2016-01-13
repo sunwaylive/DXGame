@@ -43,6 +43,6 @@ void MeshGeometry::Draw(ID3D11DeviceContext* dc, UINT subsetId)
 
 	dc->DrawIndexed(
 		mSubsetTable[subsetId].FaceCount*3, 
-		mSubsetTable[subsetId].FaceStart*3, 
+		mSubsetTable[subsetId].FaceStart*3, //read from .m3d file
 		0);
 }

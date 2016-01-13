@@ -29,6 +29,11 @@ cbuffer cbPerObject
 	float4x4 gTexTransform;
 }; 
 
+cbuffer cbSkinned
+{
+	float4x4 gBoneTransforms[96];
+};
+
 // Nonnumeric values cannot be added to a cbuffer.
 Texture2D gDiffuseMap;
 Texture2D gNormalMap;
@@ -47,6 +52,16 @@ struct VertexIn
 	float2 Tex      : TEXCOORD;
 };
 
+struct SkinnedVertexIn
+{
+	float3 PosL       : POSITION;
+	float3 NormalL    : NORMAL;
+	float2 Tex        : TEXCOORD;
+	float4 TangentL   : TANGENT;
+	float3 Weights    : WEIGHTS;
+	uint4 BoneIndices : BONEINDICES;
+};
+
 struct VertexOut
 {
 	float4 PosH : SV_POSITION;
@@ -59,6 +74,34 @@ VertexOut VS(VertexIn vin)
 
 	vout.PosH = mul(float4(vin.PosL, 1.0f), gWorldViewProj);
 	vout.Tex  = mul(float4(vin.Tex, 0.0f, 1.0f), gTexTransform).xy;
+
+	return vout;
+}
+
+VertexOut SkinnedVS(SkinnedVertexIn vin)
+{
+    VertexOut vout;
+
+	// Init array or else we get strange warnings about SV_POSITION.
+	float weights[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+	weights[0] = vin.Weights.x;
+	weights[1] = vin.Weights.y;
+	weights[2] = vin.Weights.z;
+	weights[3] = 1.0f - weights[0] - weights[1] - weights[2];
+
+	float3 posL     = float3(0.0f, 0.0f, 0.0f);
+	for(int i = 0; i < 4; ++i)
+	{
+	    // Assume no nonuniform scaling when transforming normals, so 
+		// that we do not have to use the inverse-transpose.
+	    posL     += weights[i]*mul(float4(vin.PosL, 1.0f), gBoneTransforms[vin.BoneIndices[i]]).xyz;
+	}
+ 
+	// Transform to homogeneous clip space.
+	vout.PosH = mul(float4(posL, 1.0f), gWorldViewProj);
+	
+	// Output vertex attributes for interpolation across triangle.
+	vout.Tex = mul(float4(vin.Tex, 0.0f, 1.0f), gTexTransform).xy;
 
 	return vout;
 }
@@ -249,6 +292,28 @@ technique11 BuildShadowMapAlphaClipTech
     pass P0
     {
         SetVertexShader( CompileShader( vs_5_0, VS() ) );
+        SetGeometryShader( NULL );
+        SetPixelShader( CompileShader( ps_5_0, PS() ) );
+    }
+}
+
+technique11 BuildShadowMapSkinnedTech
+{
+    pass P0
+    {
+        SetVertexShader( CompileShader( vs_5_0, SkinnedVS() ) );
+        SetGeometryShader( NULL );
+        SetPixelShader( NULL );
+
+		SetRasterizerState(Depth);
+    }
+}
+
+technique11 BuildShadowMapAlphaClipSkinnedTech
+{
+    pass P0
+    {
+        SetVertexShader( CompileShader( vs_5_0, SkinnedVS() ) );
         SetGeometryShader( NULL );
         SetPixelShader( CompileShader( ps_5_0, PS() ) );
     }

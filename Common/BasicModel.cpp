@@ -5,23 +5,23 @@ BasicModel::BasicModel(ID3D11Device* device, TextureMgr& texMgr, const std::stri
 {
 	std::vector<M3dMaterial> mats;
 	M3DLoader m3dLoader;
-	m3dLoader.LoadM3d(modelFilename, Vertices, Indices, Subsets, mats);
+	m3dLoader.LoadM3d(modelFilename, mVertices, mIndices, mSubsets, mats);
 
-	ModelMesh.SetVertices(device, &Vertices[0], Vertices.size());
-	ModelMesh.SetIndices(device, &Indices[0], Indices.size());
-	ModelMesh.SetSubsetTable(Subsets);
+	mModelMesh.SetVertices(device, &mVertices[0], mVertices.size());
+	mModelMesh.SetIndices(device, &mIndices[0], mIndices.size());
+	mModelMesh.SetSubsetTable(mSubsets);
 
-	SubsetCount = mats.size();
+	mSubsetCount = mats.size();
 
-	for(UINT i = 0; i < SubsetCount; ++i)
+	for(UINT i = 0; i < mSubsetCount; ++i)
 	{
-		Mat.push_back(mats[i].Mat);
+		mMatVec.push_back(mats[i].Mat);
 
 		ID3D11ShaderResourceView* diffuseMapSRV = texMgr.CreateTexture(texturePath + mats[i].DiffuseMapName);
-		DiffuseMapSRV.push_back(diffuseMapSRV);
+		mDiffuseMapSRVVec.push_back(diffuseMapSRV);
 
 		ID3D11ShaderResourceView* normalMapSRV = texMgr.CreateTexture(texturePath + mats[i].NormalMapName);
-		NormalMapSRV.push_back(normalMapSRV);
+		mNormalMapSRVVec.push_back(normalMapSRV);
 	}
 }
 

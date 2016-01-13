@@ -11,18 +11,18 @@ public:
 	BasicModel(ID3D11Device* device, TextureMgr& texMgr, const std::string& modelFilename, const std::wstring& texturePath);
 	~BasicModel();
 
-	UINT SubsetCount;
+	UINT mSubsetCount;
 
-	std::vector<Material> Mat;
-	std::vector<ID3D11ShaderResourceView*> DiffuseMapSRV;
-	std::vector<ID3D11ShaderResourceView*> NormalMapSRV;
+	std::vector<Material> mMatVec;
+	std::vector<ID3D11ShaderResourceView*> mDiffuseMapSRVVec;
+	std::vector<ID3D11ShaderResourceView*> mNormalMapSRVVec;
 
 	// Keep CPU copies of the mesh data to read from.  
-	std::vector<Vertex::PosNormalTexTan> Vertices;
-	std::vector<USHORT> Indices;
-	std::vector<MeshGeometry::Subset> Subsets;
+	std::vector<Vertex::PosNormalTexTan> mVertices;
+	std::vector<USHORT> mIndices;
+	std::vector<MeshGeometry::Subset> mSubsets;
 
-	MeshGeometry ModelMesh;
+	MeshGeometry mModelMesh;
 };
 
 struct BasicModelInstance
