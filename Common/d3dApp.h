@@ -65,7 +65,18 @@ protected:
 	ID3D11Texture2D* mDepthStencilBuffer;
 	ID3D11RenderTargetView* mRenderTargetView;
 	ID3D11DepthStencilView* mDepthStencilView;
-	D3D11_VIEWPORT mScreenViewport;
+	D3D11_VIEWPORT mScreenViewport; //see below
+	/*
+	typedef struct D3D11_VIEWPORT {
+	FLOAT TopLeftX;
+	FLOAT TopLeftY;
+	FLOAT Width;
+	FLOAT Height;
+	FLOAT MinDepth;
+	FLOAT MaxDepth;
+	} D3D11_VIEWPORT;
+	*/	
+
 
 	// Derived class should set these in derived constructor to customize starting values.
 	std::wstring mMainWndCaption;

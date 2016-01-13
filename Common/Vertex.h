@@ -14,14 +14,27 @@ namespace Vertex
 	// Basic 32-byte vertex structure.
 	struct Basic32
 	{
-		Basic32() : Pos(0.0f, 0.0f, 0.0f), Normal(0.0f, 0.0f, 0.0f), Tex(0.0f, 0.0f) {}
-		Basic32(const XMFLOAT3& p, const XMFLOAT3& n, const XMFLOAT2& uv)
-			: Pos(p), Normal(n), Tex(uv) {}
-		Basic32(float px, float py, float pz, float nx, float ny, float nz, float u, float v)
-			: Pos(px, py, pz), Normal(nx, ny, nz), Tex(u, v) {}
 		XMFLOAT3 Pos;
 		XMFLOAT3 Normal;
 		XMFLOAT2 Tex;
+	};
+
+	struct PosNormalTexTan
+	{
+		XMFLOAT3 Pos;
+		XMFLOAT3 Normal;
+		XMFLOAT2 Tex;
+		XMFLOAT4 TangentU;
+	};
+
+	struct PosNormalTexTanSkinned
+	{
+		XMFLOAT3 Pos;
+		XMFLOAT3 Normal;
+		XMFLOAT2 Tex;
+		XMFLOAT4 TangentU;
+		XMFLOAT3 Weights;
+		BYTE BoneIndices[4];
 	};
 }
 
@@ -29,7 +42,10 @@ class InputLayoutDesc
 {
 public:
 	// Init like const int A::a[4] = {0, 1, 2, 3}; in .cpp file.
+	static const D3D11_INPUT_ELEMENT_DESC Pos[1];
 	static const D3D11_INPUT_ELEMENT_DESC Basic32[3];
+	static const D3D11_INPUT_ELEMENT_DESC PosNormalTexTan[4];
+	static const D3D11_INPUT_ELEMENT_DESC PosNormalTexTanSkinned[6];
 };
 
 class InputLayouts
@@ -38,7 +54,10 @@ public:
 	static void InitAll(ID3D11Device* device);
 	static void DestroyAll();
 
+	static ID3D11InputLayout* Pos;
 	static ID3D11InputLayout* Basic32;
+	static ID3D11InputLayout* PosNormalTexTan;
+	static ID3D11InputLayout* PosNormalTexTanSkinned;
 };
 
 #endif // VERTEX_H
