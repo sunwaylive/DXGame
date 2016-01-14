@@ -6,7 +6,7 @@
 // Controls:
 //		Hold the left mouse button down and move the mouse to rotate.
 //      Hold the right mouse button down to zoom in and out.
-//      Press '1' for wireframe
+//      Press '1' for wire frame
 //
 //***************************************************************************************
 
@@ -21,6 +21,9 @@
 #include "RenderStates.h"
 #include "GeometryGenerator.h"
 #include "MeshGeometry.h"
+#include "xnacollision.h"
+
+#include <iostream>
 
 //used for sky sphere
 struct BoundingSphere
@@ -53,6 +56,9 @@ private:
 	void BuildShapeGeometryBuffers();
 	void BuildSkullGeometryBuffers();
 	void BuildScreenQuadGeometryBuffers();
+
+	//Pick things in the world
+	void Pick(int px, int py);
 
 private:
 	TextureMgr mTexMgr;
@@ -125,6 +131,13 @@ private:
 
 	Camera mCam;
 	POINT mLastMousePos;
+
+	//For picking ray, defined in xnacollision.h
+	XNA::AxisAlignedBox mSkullAABB;
+	std::vector<UINT> mSkullIndices;
+	std::vector<Vertex::Basic32> mSkullVertices;
+	Material mPickedTriangleMat;
+	UINT mPickedTriangle;
 };
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance, PSTR cmdLine, int showCmd)
@@ -145,7 +158,8 @@ SkinnedMeshApp::SkinnedMeshApp(HINSTANCE hInstance)
   mStoneTexSRV(0), mBrickTexSRV(0),
   mStoneNormalTexSRV(0), mBrickNormalTexSRV(0),
   mSkullIndexCount(0), mSmap(0), mSsao(0),
-  mLightRotationAngle(0.0f)
+  mLightRotationAngle(0.0f),
+  mPickedTriangle(-1)
 {
 	mMainWndCaption = L"Skinned Mesh";
 
@@ -236,6 +250,10 @@ SkinnedMeshApp::SkinnedMeshApp(HINSTANCE hInstance)
 	mSkullMat.Diffuse = XMFLOAT4(0.2f, 0.2f, 0.2f, 1.0f);
 	mSkullMat.Specular = XMFLOAT4(0.5f, 0.5f, 0.5f, 16.0f);
 	mSkullMat.Reflect = XMFLOAT4(0.3f, 0.3f, 0.3f, 1.0f);
+
+	mPickedTriangleMat.Ambient = XMFLOAT4(0.0f, 0.8f, 0.4f, 1.0f);
+	mPickedTriangleMat.Diffuse = XMFLOAT4(0.0f, 0.8f, 0.4f, 1.0f);
+	mPickedTriangleMat.Specular = XMFLOAT4(0.0f, 0.0f, 0.0f, 16.0f);
 }
 
 SkinnedMeshApp::~SkinnedMeshApp()
@@ -455,22 +473,35 @@ void SkinnedMeshApp::BuildSkullGeometryBuffers()
 	fin >> ignore >> tcount;
 	fin >> ignore >> ignore >> ignore >> ignore;
 
-	std::vector<Vertex::Basic32> vertices(vcount);
+	XMFLOAT3 vMinf3(+MathHelper::Infinity, +MathHelper::Infinity, +MathHelper::Infinity);
+	XMFLOAT3 vMaxf3(-MathHelper::Infinity, -MathHelper::Infinity, -MathHelper::Infinity);
+
+	XMVECTOR vMin = XMLoadFloat3(&vMinf3);
+	XMVECTOR vMax = XMLoadFloat3(&vMaxf3);
+	
+	mSkullVertices.resize(vcount);
 	for (UINT i = 0; i < vcount; ++i)
 	{
-		fin >> vertices[i].Pos.x >> vertices[i].Pos.y >> vertices[i].Pos.z;
-		fin >> vertices[i].Normal.x >> vertices[i].Normal.y >> vertices[i].Normal.z;
+		fin >> mSkullVertices[i].Pos.x >> mSkullVertices[i].Pos.y >> mSkullVertices[i].Pos.z;
+		fin >> mSkullVertices[i].Normal.x >> mSkullVertices[i].Normal.y >> mSkullVertices[i].Normal.z;
+
+		XMVECTOR P = XMLoadFloat3(&mSkullVertices[i].Pos);
+		vMin = XMVectorMin(vMin, P);
+		vMax = XMVectorMax(vMax, P);
 	}
+
+	XMStoreFloat3(&mSkullAABB.Center, 0.5 * (vMin + vMax));
+	XMStoreFloat3(&mSkullAABB.Extents, 0.5 * (vMax - vMin));
 
 	fin >> ignore;
 	fin >> ignore;
 	fin >> ignore;
 
 	mSkullIndexCount = 3 * tcount;
-	std::vector<UINT> indices(mSkullIndexCount);
+	mSkullIndices.resize(mSkullIndexCount);
 	for (UINT i = 0; i < tcount; ++i)
 	{
-		fin >> indices[i * 3 + 0] >> indices[i * 3 + 1] >> indices[i * 3 + 2];
+		fin >> mSkullIndices[i * 3 + 0] >> mSkullIndices[i * 3 + 1] >> mSkullIndices[i * 3 + 2];
 	}
 
 	fin.close();
@@ -482,7 +513,7 @@ void SkinnedMeshApp::BuildSkullGeometryBuffers()
 	vbd.CPUAccessFlags = 0;
 	vbd.MiscFlags = 0;
 	D3D11_SUBRESOURCE_DATA vinitData;
-	vinitData.pSysMem = &vertices[0];
+	vinitData.pSysMem = &mSkullVertices[0];
 	HR(md3dDevice->CreateBuffer(&vbd, &vinitData, &mSkullVB));
 
 	//
@@ -496,7 +527,7 @@ void SkinnedMeshApp::BuildSkullGeometryBuffers()
 	ibd.CPUAccessFlags = 0;
 	ibd.MiscFlags = 0;
 	D3D11_SUBRESOURCE_DATA iinitData;
-	iinitData.pSysMem = &indices[0];
+	iinitData.pSysMem = &mSkullIndices[0];
 	HR(md3dDevice->CreateBuffer(&ibd, &iinitData, &mSkullIB));
 }
 
@@ -741,8 +772,24 @@ void SkinnedMeshApp::DrawScene()
 
 		activeSkullTech->GetPassByIndex(p)->Apply(0, md3dImmediateContext);
 		md3dImmediateContext->DrawIndexed(mSkullIndexCount, 0, 0);
-	}
+	
+		// Draw just the picked triangle again with a different material to highlight it.
+		if (mPickedTriangle != -1)
+		{
+			// Change depth test from < to <= so that if we draw the same triangle twice, it will still pass
+			// the depth test.  This is because we redraw the picked triangle with a different material
+			// to highlight it.  
+			md3dImmediateContext->OMSetDepthStencilState(RenderStates::LessEqualDSS, 0);
 
+			Effects::BasicFX->SetMaterial(mPickedTriangleMat);
+			activeSkullTech->GetPassByIndex(p)->Apply(0, md3dImmediateContext);
+			md3dImmediateContext->DrawIndexed(3, 3 * mPickedTriangle, 0);
+
+			// restore default, because this is used before we changed it for drawing pick
+			md3dImmediateContext->OMSetDepthStencilState(RenderStates::EqualsDSS, 0);
+		}
+	}
+		
 	// Draw the animated characters.
 	md3dImmediateContext->IASetInputLayout(InputLayouts::PosNormalTexTanSkinned);
 	activeSkinnedTech->GetDesc(&techDesc);
@@ -1199,10 +1246,17 @@ void SkinnedMeshApp::DrawSceneToSsaoNormalDepthMap()
 
 void SkinnedMeshApp::OnMouseDown(WPARAM btnState, int x, int y)
 {
-	mLastMousePos.x = x;
-	mLastMousePos.y = y;
+	if ((btnState & MK_LBUTTON) != 0)
+	{
+		mLastMousePos.x = x;
+		mLastMousePos.y = y;
 
-	SetCapture(mhMainWnd);
+		SetCapture(mhMainWnd);
+	}
+	else if ((btnState & MK_RBUTTON) != 0)
+	{
+		Pick(x, y);
+	}
 }
 
 void SkinnedMeshApp::OnMouseUp(WPARAM btnState, int x, int y)
@@ -1315,3 +1369,77 @@ void SkinnedMeshApp::BuildScreenQuadGeometryBuffers()
 	iinitData.pSysMem = &quad.Indices[0];
 	HR(md3dDevice->CreateBuffer(&ibd, &iinitData, &mScreenQuadIB));
 }
+
+void SkinnedMeshApp::Pick(int px, int py)
+{
+	//BUG: We can only pick points in the character
+	XMFLOAT4X4 mMeshWorld = mSkullWorld;
+
+	XMMATRIX P = mCam.Proj();
+	 
+	//Compute picking ray in view space.
+	float vx = (+2.0f * px / mClientWidth - 1.0f) / P(0, 0);
+	float vy = (-2.0f * py / mClientHeight + 1.0f) / P(1, 1);
+
+	//Ray definition in view space.
+	//every time you pick an object, the picking ray always start from origin point
+	XMVECTOR rayOrigin = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
+	//Always use depth = 1.0 point
+	XMVECTOR rayDir = XMVectorSet(vx, vy, 1.0f, 0.0f);
+
+	//Transform ray to local
+	XMMATRIX V = mCam.View();
+	XMMATRIX invView = XMMatrixInverse(&XMMatrixDeterminant(V), V);
+
+	XMMATRIX W = XMLoadFloat4x4(&mMeshWorld);
+	XMMATRIX invWorld = XMMatrixInverse(&XMMatrixDeterminant(W), W);
+
+	XMMATRIX toLocal = XMMatrixMultiply(invView, invWorld);
+
+	//Transform to another coordinate system.
+	rayOrigin = XMVector3TransformCoord(rayOrigin, toLocal);
+	rayDir = XMVector3TransformNormal(rayDir, toLocal);
+
+	//Normalize ray dir
+	rayDir = XMVector3Normalize(rayDir);
+
+	//If we hit the bounding box of a mesh, then we might have picked a Mesh
+	//triangle, to continue to do finer ray/triangle test.
+
+	//Assume we have not picked anything, so init to -1
+	mPickedTriangle = -1;
+	float tmin = 0.0f;
+
+	if (XNA::IntersectRayAxisAlignedBox(rayOrigin, rayDir, &mSkullAABB, &tmin))
+	{
+		//Find the nearest ray/triangle intersection
+		tmin = MathHelper::Infinity;
+		for (int i = 0; i < mSkullIndices.size() / 3; ++i)
+		{
+			//Indices for this triangle
+			UINT i0 = mSkullIndices[i * 3 + 0];
+			UINT i1 = mSkullIndices[i * 3 + 1];
+			UINT i2 = mSkullIndices[i * 3 + 2];
+
+			//Vertices for this triangle.
+			XMVECTOR v0 = XMLoadFloat3(&mSkullVertices[i0].Pos);
+			XMVECTOR v1 = XMLoadFloat3(&mSkullVertices[i1].Pos);
+			XMVECTOR v2 = XMLoadFloat3(&mSkullVertices[i2].Pos);
+
+			//We have to iterate over all the triangles in order to find 
+			//the nearest intersection.
+			float t = 0.0f;
+			if (XNA::IntersectRayTriangle(rayOrigin, rayDir, v0, v1, v2, &t))
+			{
+				if (t < tmin)
+				{
+					//This is the nearest picked triangle.
+					tmin = t;
+					mPickedTriangle = i;
+				}
+			}
+		}//end for mSkullIndices
+	}//end for if IntersectRayAxisAlignedBox
+
+	std::cout <<"mPickedTriangle: " <<mPickedTriangle << std::endl;
+} 

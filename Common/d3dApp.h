@@ -15,6 +15,12 @@
 #include "GameTimer.h"
 #include <string>
 
+#ifdef _DEBUG
+#pragma comment(linker, "/subsystem:console /entry:wWinMainCRTStartup")//Œ“”√VS2005
+#endif
+
+#pragma comment( linker, "/subsystem:console /entry:WinMainCRTStartup" )
+
 class D3DApp
 {
 public:
