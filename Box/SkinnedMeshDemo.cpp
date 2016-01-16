@@ -1397,7 +1397,13 @@ void SkinnedMeshApp::Pick(int px, int py)
 	XMMATRIX toLocal = XMMatrixMultiply(invView, invWorld);
 
 	//Transform to another coordinate system.
+	//For the last two functions XMVector3TransformCoord and XMVector3TransformNormal, you do not need to
+	//explicitly set the w coordinate.The functions will always use vw = 1 and vw = 0 for XMVector3TransformCoord and
+	//XMVector3TransformNormal, respectively.
+
+	//Computes the vector-matrix product v*M where v(w) = 1 for transforming points
 	rayOrigin = XMVector3TransformCoord(rayOrigin, toLocal);
+	//Computes the vector-matrix product v*M where v(w) = 0 for transforming vectors:
 	rayDir = XMVector3TransformNormal(rayDir, toLocal);
 
 	//Normalize ray dir

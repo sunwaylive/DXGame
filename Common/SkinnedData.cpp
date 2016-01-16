@@ -31,6 +31,7 @@ float BoneAnimation::GetEndTime()const
 
 void BoneAnimation::Interpolate(float t, XMFLOAT4X4& M)const
 {
+	// t is before the animation started, so just return the first key frame.
 	if( t <= Keyframes.front().TimePos )
 	{
 		XMVECTOR S = XMLoadFloat3(&Keyframes.front().Scale);
@@ -38,8 +39,19 @@ void BoneAnimation::Interpolate(float t, XMFLOAT4X4& M)const
 		XMVECTOR Q = XMLoadFloat4(&Keyframes.front().RotationQuat);
 
 		XMVECTOR zero = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
+		/*
+		Returns the affine transformation matrix, built from the scaling, rotation, and translation information.
+		XMMATRIX XMMatrixAffineTransformation(
+		[in] XMVECTOR Scaling,
+		[in] XMVECTOR RotationOrigin,
+		[in] XMVECTOR RotationQuaternion,
+		[in] XMVECTOR Translation
+		);
+		*/
+
 		XMStoreFloat4x4(&M, XMMatrixAffineTransformation(S, zero, Q, P));
 	}
+	// t is after the animation ended, so just return the last key frame.
 	else if( t >= Keyframes.back().TimePos )
 	{
 		XMVECTOR S = XMLoadFloat3(&Keyframes.back().Scale);
@@ -49,10 +61,12 @@ void BoneAnimation::Interpolate(float t, XMFLOAT4X4& M)const
 		XMVECTOR zero = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);
 		XMStoreFloat4x4(&M, XMMatrixAffineTransformation(S, zero, Q, P));
 	}
+	//t is between two key frames, so interpolate.
 	else
 	{
 		for(UINT i = 0; i < Keyframes.size()-1; ++i)
 		{
+			//Find the interval of target time
 			if( t >= Keyframes[i].TimePos && t <= Keyframes[i+1].TimePos )
 			{
 				float lerpPercent = (t - Keyframes[i].TimePos) / (Keyframes[i+1].TimePos - Keyframes[i].TimePos);
@@ -66,8 +80,38 @@ void BoneAnimation::Interpolate(float t, XMFLOAT4X4& M)const
 				XMVECTOR q0 = XMLoadFloat4(&Keyframes[i].RotationQuat);
 				XMVECTOR q1 = XMLoadFloat4(&Keyframes[i+1].RotationQuat);
 
+				/*
+				XMVECTOR XMVectorLerp(
+				[in] XMVECTOR V0,
+				[in] XMVECTOR V1,
+				[in] float    t
+				);
+
+				The following pseudo codes demonstrates the operation of the function:
+				XMVECTOR Result;
+
+				Result.x = V0.x + t * (V1.x - V0.x);
+				Result.y = V0.y + t * (V1.y - V0.y);
+				Result.z = V0.z + t * (V1.z - V0.z);
+				Result.w = V0.w + t * (V1.w - V0.w);
+
+				return Result;
+				*/
+
+				/*
+				Note it is fairly simple to use this function for doing a cubic interpolation instead of a linear interpolation as follows:
+				XMVECTOR SmoothStep( XMVECTOR V0, XMVECTOR V1, float t )
+				{
+				t = (t > 1.0f) ? 1.0f : ((t < 0.0f) ? 0.0f : t);  // Clamp value to 0 to 1
+				t = t*t*(3.f - 2.f*t);
+				return XMVectorLerp( V0, V1, t );
+				}
+				*/
 				XMVECTOR S = XMVectorLerp(s0, s1, lerpPercent);
 				XMVECTOR P = XMVectorLerp(p0, p1, lerpPercent);
+
+				//Interpolates between two unit quaternions, using spherical linear interpolation.
+				//Returns the interpolated quaternion. If Q0 and Q1 are not unit quaternions, the resulting interpolation is undefined.
 				XMVECTOR Q = XMQuaternionSlerp(q0, q1, lerpPercent);
 
 				XMVECTOR zero = XMVectorSet(0.0f, 0.0f, 0.0f, 1.0f);

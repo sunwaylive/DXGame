@@ -403,6 +403,7 @@ XMFINLINE XMMATRIX XMMatrixTranspose
 
 //------------------------------------------------------------------------------
 // Return the inverse and the determinant of a 4x4 matrix
+// Input (det M, det M, det M, det M)
 XMINLINE XMMATRIX XMMatrixInverse
 (
     XMVECTOR* pDeterminant, 
@@ -652,6 +653,7 @@ XMINLINE XMMATRIX XMMatrixInverse
 }
 
 //------------------------------------------------------------------------------
+//Returns(det M, det M, det M, det M)
 
 XMINLINE XMVECTOR XMMatrixDeterminant
 (
